@@ -94,7 +94,7 @@ function benchmarkCycleHandler(event) {
 var benchmarkSuiteSet = new Benchmark.Suite;
 benchmarkSuiteSet
     .add('Obj set()', doObjSetBenchmark)
-    .add('Set set()', doMapSetBenchmark)
+    .add('Set set()', doSetSetBenchmark)
     .add('Map set()', doMapSetBenchmark)
     .on('cycle', benchmarkCycleHandler)
     .on('complete', function() {
@@ -105,7 +105,7 @@ benchmarkSuiteSet
 var benchmarkSuiteGet = new Benchmark.Suite;
 benchmarkSuiteGet
     .add('Obj get()', doObjGetBenchmark)
-    .add('Set get()', doMapGetBenchmark)
+    .add('Set get()', doSetGetBenchmark)
     .add('Map get()', doMapGetBenchmark)
     .on('cycle', benchmarkCycleHandler)
     .on('complete', function() {
