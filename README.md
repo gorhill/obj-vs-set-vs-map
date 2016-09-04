@@ -1,5 +1,5 @@
 # obj-vs-set-vs-map
-Just a benchmark to measure performance of Set(), Map() versus Object.create(null)
+Just a benchmark to measure performance of `Set()`, `Map()` versus `Object.create(null)`.
 
 Run the benchmark for your current browser: <https://gorhill.github.io/obj-vs-set-vs-map/>.
 
