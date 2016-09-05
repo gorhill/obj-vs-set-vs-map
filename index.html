@@ -11,6 +11,7 @@
 <div id="results" style="white-space:pre;font-family:mono"></div>
 
 <script src="lodash.js"></script>
+<script src="platform.js"></script>
 <script src="benchmark.js"></script>
 <script>
 var haystack = [];
@@ -26,7 +27,9 @@ function stdout(text) {
 
 function doBenchmark() {
     document.getElementById('results').innerHTML = '';
-    stdout('Benchmarking, the higher ops/sec the better:\n\n');
+    stdout('Benchmarking, the higher ops/sec the better...\n\n');
+    stdout(Benchmark.platform.toString());
+    stdout('\n\n');
     benchmarkSuiteSet.run({ 'async': true });
 }
 
@@ -109,6 +112,7 @@ benchmarkSuiteGet
     .add('Map get()', doMapGetBenchmark)
     .on('cycle', benchmarkCycleHandler)
     .on('complete', function() {
+        stdout('\nDone.');
     });
 
 window.onload = function() {
