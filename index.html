@@ -6,7 +6,7 @@
 <body style="font: 14px sans-serif">
 <h1>Benchmark: Object, Map, Set</h1>
 <p>To find out whether it's worth replacing Object.create(null) with Set() or Map().</p>
-<p><button id="runBenchmark">Run</button></p>
+<p><label>Lookup hit ratio</label>: <input id="hitratio" type="text" value="50" size="3">%&emsp;<button id="runBenchmark">Run</button></p>
 <a href="https://github.com/gorhill/obj-vs-set-vs-map"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/38ef81f8aca64bb9a64448d0d70f1308ef5341ab/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png"></a>
 <h2>stdout</h2>
 <div id="results" style="white-space:pre;font-family:mono"></div>
@@ -15,6 +15,7 @@
 <script src="platform.js"></script>
 <script src="benchmark.js"></script>
 <script>
+var hitratio = 50;
 var haystack = [];
 var needles = [];
 var theObj;
@@ -29,7 +30,9 @@ function stdout(text) {
 function doBenchmark() {
     document.getElementById('results').innerHTML = '';
     stdout('Benchmarking, the higher ops/sec the better...\n\n');
-    stdout(Benchmark.platform.toString());
+    stdout(Benchmark.platform.toString() + '.');
+    stdout('\nHaystack has ' + haystack.length + ' items.');
+    stdout('\nThere are ' + needles.length + ' needles ' + hitratio + '% of which are in the haystack.');
     stdout('\n\n');
     benchmarkSuiteSet.run({ 'async': true });
 }
@@ -38,7 +41,7 @@ function doObjSetBenchmark() {
     var map = Object.create(null),
         aa = haystack;
     for ( var i = 0, n = aa.length; i < n; i++ ) {
-        map[aa[i]] = true;
+        map[aa[i]] = i;
     }
     theObj = map;
 }
@@ -56,7 +59,7 @@ function doMapSetBenchmark() {
     var map = new Map(),
         aa = haystack;
     for ( var i = 0, n = aa.length; i < n; i++ ) {
-        map.set(aa[i], true);
+        map.set(aa[i], i);
     }
     theMap = map;
 }
@@ -97,24 +100,58 @@ function benchmarkCycleHandler(event) {
 
 var benchmarkSuiteSet = new Benchmark.Suite;
 benchmarkSuiteSet
-    .add('Obj set()', doObjSetBenchmark)
-    .add('Set set()', doSetSetBenchmark)
-    .add('Map set()', doMapSetBenchmark)
+    .add('-    Obj[string] = int', doObjSetBenchmark)
+    .add('-      Set.add(string)', doSetSetBenchmark)
+    .add('- Map.set(string, int)', doMapSetBenchmark)
+    .on('start', function() {
+        stdout('Creating haystack using ...\n');
+        })
     .on('cycle', benchmarkCycleHandler)
     .on('complete', function() {
         stdout('\n');
         benchmarkSuiteGet.run({ 'async': true });
-    });
+        });
 
 var benchmarkSuiteGet = new Benchmark.Suite;
 benchmarkSuiteGet
-    .add('Obj get()', doObjGetBenchmark)
-    .add('Set get()', doSetGetBenchmark)
-    .add('Map get()', doMapGetBenchmark)
+    .add('-  Object[string]', doObjGetBenchmark)
+    .add('- Set.has(string)', doSetGetBenchmark)
+    .add('- Map.get(string)', doMapGetBenchmark)
+    .on('start', function() {
+        stdout('Searching haystack using ...\n');
+        })
     .on('cycle', benchmarkCycleHandler)
     .on('complete', function() {
         stdout('\nDone.');
     });
+
+
+var rndint = function(n) {
+    return Math.floor(Math.random() * n);
+};
+
+var newNeedles = function() {
+    needles = new Array(1000);
+
+    var input = document.getElementById('hitratio');
+    hitratio = parseInt(input.value, 10);
+    if ( isNaN(hitratio) ) {
+        input.value = 50;
+    }
+    hitratio = Math.max(0, Math.min(100, hitratio));
+
+    // Create a random set of random words
+    for ( var i = 0, n = 1000; i < n; i++ ) {
+        needles[i] = rndint(Number.MAX_SAFE_INTEGER).toString(36);
+    }
+    // Replace n% of the random set (default to misses) with known words (hits)
+    if ( hitratio > 0 ) {
+        var step = 100 / hitratio;
+        for ( var i = 0; i < n; i += step ) {
+            needles[Math.floor(i)] = haystack[rndint(haystack.length)];
+        }
+    }
+};
 
 window.onload = function() {
     // Read huge list of words
@@ -122,18 +159,8 @@ window.onload = function() {
     haystack = thelist.textContent.split(/\s+/);
     thelist = null;
 
-    var rndint = function(n) {
-        return Math.floor(Math.random() * n);
-    };
-
-    // Create a random set of random words
-    for ( var i = 0, n = 1000; i < n; i++ ) {
-        needles.push(rndint(Number.MAX_SAFE_INTEGER).toString(36));
-    }
-    // Replace 20% of the random set (misses) with known words (hits)
-    for ( var i = 0, n = 200; i < n; i++ ) {
-        needles[rndint(1000)] = haystack[rndint(haystack.length)];
-    }
+    document.getElementById('hitratio').addEventListener('change', newNeedles);
+    newNeedles();
 
     document.getElementById('runBenchmark').onclick = function() {
         doBenchmark();
