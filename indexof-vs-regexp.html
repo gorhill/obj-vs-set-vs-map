@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body style="font: 14px sans-serif">
+<h1>Benchmark: String.indexOf() vs RegExp.test()</h1>
+<p><button id="runBenchmark">Run</button></p>
+<div id="results-0" style="white-space:pre;font-family:mono"></div>
+<div id="results-1" style="white-space:pre;font-family:mono"></div>
+<div id="results-2" style="white-space:pre;font-family:mono"></div>
+<div id="results-3" style="white-space:pre;font-family:mono"></div>
+<div id="results-4" style="white-space:pre;font-family:mono"></div>
+<div id="results-5" style="white-space:pre;font-family:mono"></div>
+
+<script src="https://cdn.jsdelivr.net/lodash/4.17.2/lodash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/platform.js/1.3.3/platform.js"></script>
+<script src="https://cdn.jsdelivr.net/benchmarkjs/2.1.2/benchmark.js"></script>
+<script>
+var gResult;
+var gWhich;
+var gBenchmarks = [ null ];
+
+function stdout(which, text) {
+    var r = document.querySelector('#results-' + which);
+    if ( text === '' ) {
+        r.innerHTML = '';
+    } else {
+        r.innerHTML += text;
+    }
+}
+
+function doBenchmark() {
+    stdout(0, '');
+    stdout(0, 'Benchmarking, the higher ops/sec the better.\n');
+    stdout(0, Benchmark.platform.toString() + '.');
+    stdout(0, '\n\n');
+    gWhich = 1;
+    gBenchmarks[gWhich].run({ 'async': true });
+}
+
+function nextBenchmark() {
+    stdout(gWhich, 'Done.\n\n');
+    gWhich += 1;
+    var bms = gBenchmarks[gWhich];
+    if ( bms ) {
+        bms.run({ 'async': true });
+    }
+}
+
+gBenchmarks.push((function() {
+    var args = ['.jpg', '.png', '.xxx', '.xyz', '.lol', '.abc', '.git', '.extension'];
+    var precompiledRegex = /\.(?:ico|png|gif|jpg|jpeg|webp)$/;
+    function createNeedle() {
+        return args[Math.floor(Math.random() * 65536) % args.length];
+    }
+    var bms = new Benchmark.Suite();
+    bms
+        .add('  -   "...".indexOf', function() {
+            gResult = '.ico.png.gif.jpg.jpeg.webp.'.indexOf(createNeedle() + '.') !== -1;
+            })
+        .add('  -  "...".includes', function() {
+            gResult = '.ico.png.gif.jpg.jpeg.webp.'.includes(createNeedle() + '.');
+            })
+        .add('  -      /.../.test', function() {
+            gResult = /\.(?:ico|png|gif|jpg|jpeg|webp)$/.test(createNeedle());
+            })
+        .add('  -     RegExp.test', function() {
+            gResult = precompiledRegex.test(createNeedle());
+            })
+        .on('start', function() {
+            stdout(gWhich, '');
+            stdout(gWhich, 'Literal haystack: ".ico.png.gif.jpg.jpeg.webp."\n');
+            stdout(gWhich, 'Variable needle: one of [.jpg .png .xxx .xyz .lol .abc .git .ext]\n');
+            })
+        .on('cycle', function(event) {
+            stdout(gWhich, String(event.target) + '\n');
+            })
+        .on('complete', nextBenchmark);
+    return bms;
+})());
+
+gBenchmarks.push((function() {
+    var haystacks = [
+        'http://arstechnica.com/gaming/2016/11/easter-eggs-evolved-why-gamers-spent-3-years-plus-studying-gtavs-mount-chiliad/',
+        'http://arstechnica.com/gaming/2016/11/here-are-the-games-with-expanded-color-support-for-your-new-hdr-tv//',
+        'http://arstechnica.com/business/2016/11/supercomputer-japan-130-petaflop-china-beating-number-cruncher/',
+        'http://arstechnica.com/business/2016/11/epa-increases-the-amount-of-renewable-fuel-to-be-blended-into-gasoline/'
+    ];
+    function createHaystack() {
+        return haystacks[Math.floor(Math.random() * 65536) % haystacks.length];
+    }
+    var precompiledRegex = /#/;
+    var bms = new Benchmark.Suite();
+    bms
+        .add('  -  String.indexOf', function() {
+            gResult = createHaystack().indexOf('#') !== -1;
+            })
+        .add('  - String.includes', function() {
+            gResult = createHaystack().includes('#');
+            })
+        .add('  -      /.../.test', function() {
+            gResult = /#/.test(createHaystack());
+            })
+        .add('  -     RegExp.test', function() {
+            gResult = precompiledRegex.test(createHaystack());
+            })
+        .on('start', function() {
+            stdout(gWhich, '');
+            stdout(gWhich, 'Variable haystack: one from a set of URLs\n');
+            stdout(gWhich, 'Literal needle: "#"\n');
+            })
+        .on('cycle', function(event) {
+            stdout(gWhich, String(event.target) + '\n');
+            })
+        .on('complete', nextBenchmark);
+    return bms;
+})());
+
+gBenchmarks.push((function() {
+    var haystacks = [
+        'http://arstechnica.com/gaming/2016/11/easter-eggs-evolved-why-gamers-spent-3-years-plus-studying-gtavs-mount-chiliad/',
+        'http://arstechnica.com/gaming/2016/11/here-are-the-games-with-expanded-color-support-for-your-new-hdr-tv//',
+        'http://arstechnica.com/business/2016/11/supercomputer-japan-130-petaflop-china-beating-number-cruncher/',
+        'http://arstechnica.com/business/2016/11/epa-increases-the-amount-of-renewable-fuel-to-be-blended-into-gasoline/'
+    ];
+    function createHaystack() {
+        return haystacks[Math.floor(Math.random() * 65536) % haystacks.length];
+    }
+    var precompiledRegex = /##/;
+    var bms = new Benchmark.Suite();
+    bms
+        .add('  -  String.indexOf', function() {
+            gResult = createHaystack().indexOf('##') !== -1;
+            })
+        .add('  - String.includes', function() {
+            gResult = createHaystack().includes('##');
+            })
+        .add('  -      /.../.test', function() {
+            gResult = /##/.test(createHaystack());
+            })
+        .add('  -     RegExp.test', function() {
+            gResult = precompiledRegex.test(createHaystack());
+            })
+        .on('start', function() {
+            stdout(gWhich, '');
+            stdout(gWhich, 'Variable haystack: one from a set of URLs\n');
+            stdout(gWhich, 'Literal needle: "##"\n');
+            })
+        .on('cycle', function(event) {
+            stdout(gWhich, String(event.target) + '\n');
+            })
+        .on('complete', nextBenchmark);
+    return bms;
+})());
+
+gBenchmarks.push((function() {
+    var haystacks = [
+        'http://arstechnica.com/gaming/2016/11/easter-eggs-evolved-why-gamers-spent-3-years-plus-studying-gtavs-mount-chiliad/',
+        'http://arstechnica.com/gaming/2016/11/here-are-the-games-with-expanded-color-support-for-your-new-hdr-tv//',
+        'http://arstechnica.com/business/2016/11/supercomputer-japan-130-petaflop-china-beating-number-cruncher/',
+        'http://arstechnica.com/business/2016/11/epa-increases-the-amount-of-renewable-fuel-to-be-blended-into-gasoline/'
+    ];
+    function createHaystack() {
+        return haystacks[Math.floor(Math.random() * 65536) % haystacks.length];
+    }
+    var precompiledRegex = /###/;
+    var bms = new Benchmark.Suite();
+    bms
+        .add('  -  String.indexOf', function() {
+            gResult = createHaystack().indexOf('###') !== -1;
+            })
+        .add('  - String.includes', function() {
+            gResult = createHaystack().includes('###');
+            })
+        .add('  -      /.../.test', function() {
+            gResult = /###/.test(createHaystack());
+            })
+        .add('  -     RegExp.test', function() {
+            gResult = precompiledRegex.test(createHaystack());
+            })
+        .on('start', function() {
+            stdout(gWhich, '');
+            stdout(gWhich, 'Variable haystack: one from a set of URLs\n');
+            stdout(gWhich, 'Literal needle: "###"\n');
+            })
+        .on('cycle', function(event) {
+            stdout(gWhich, String(event.target) + '\n');
+            })
+        .on('complete', nextBenchmark);
+    return bms;
+})());
+
+window.onload = function() {
+    document.getElementById('runBenchmark').onclick = function() {
+        doBenchmark();
+    };
+};
+</script>
+</body>
+</html>
