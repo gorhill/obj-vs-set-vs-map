@@ -17,7 +17,7 @@
 <script src="https://cdn.jsdelivr.net/platform.js/1.3.3/platform.js"></script>
 <script src="https://cdn.jsdelivr.net/benchmarkjs/2.1.2/benchmark.js"></script>
 <script>
-var gResult;
+var gResult1, gResult2, gResult3;
 var gWhich;
 var gBenchmarks = [ null ];
 
@@ -49,24 +49,80 @@ function nextBenchmark() {
 }
 
 gBenchmarks.push((function() {
+    var urls = [
+        'https://s.ytimg.com/yts/img/favicon_48-vfl1s0rGh.png',
+        'https://yt3.ggpht.com/sb2L1HmdaI8Kvye2SIT8-Ell0c5dCCW7qbBRFSJI6T.lol',
+        'https://s.ytimg.com/yts/imgbin/www-hitchhiker-vfllryam5.webp',
+        'https://fonts.gstatic.com/s/roboto/v15/RxZJdnzeo3R5zSexge8UUVtXRa8TVwTICgirnJhmVJw.woff2',
+        'https://googleads.g.doubleclick.net/pagead/id.ext',
+        'https://pubads.g.doubleclick.net/gampad/ads.jpg'
+    ];
     var args = ['.jpg', '.png', '.xxx', '.xyz', '.lol', '.abc', '.git', '.extension'];
-    var precompiledRegex = /\.(?:ico|png|gif|jpg|jpeg|webp)$/;
+    var precompiledRegex1 = /\.(?:ico|png|gif|jpg|jpeg|webp)$/;
+    var precompiledRegex2 = /\.(?:mp3|mp4|webp)$/;
+    var precompiledRegex3 = /\.(?:eot|otf|svg|ttf|woff|woff2)$/;
+    var precompiledMap = new Map([
+            // fonts
+            ['eot', 'font'],
+            ['otf', 'font'],
+            ['svg', 'font'],
+            ['ttf', 'font'],
+            ['woff', 'font'],
+            ['woff2', 'font'],
+            // media
+            ['mp3', 'media'],
+            ['mp4', 'media'],
+            ['webm', 'media'],
+            // images
+            ['gif', 'image'],
+            ['ico', 'image'],
+            ['jpeg', 'image'],
+            ['jpg', 'image'],
+            ['png', 'image'],
+            ['webp', 'image'],
+    ]);
+    function pickURL() {
+        return urls[Math.floor(Math.random() * 65536) % urls.length];
+    }
     function createNeedle() {
-        return args[Math.floor(Math.random() * 65536) % args.length];
+        var url = pickURL(),
+            pos = url.indexOf('.', url.length - 6);
+        return pos !== -1 ? url.slice(pos) : '';
     }
     var bms = new Benchmark.Suite();
     bms
-        .add('  -   "...".indexOf', function() {
-            gResult = '.ico.png.gif.jpg.jpeg.webp.'.indexOf(createNeedle() + '.') !== -1;
+        .add('  -     "...".indexOf', function() {
+            var needle = createNeedle() + '.';
+            gResult1 = '.ico.png.gif.jpg.jpeg.webp.'.indexOf(needle) !== -1;
+            gResult2 = '.mp3.mp4.webm.'.indexOf(needle) !== -1;
+            gResult3 = '.eot.otf.svg.ttf.woff.woff2.'.indexOf(needle) !== -1;
             })
-        .add('  -  "...".includes', function() {
-            gResult = '.ico.png.gif.jpg.jpeg.webp.'.includes(createNeedle() + '.');
+        .add('  -    "...".includes', function() {
+            var needle = createNeedle() + '.';
+            gResult1 = '.ico.png.gif.jpg.jpeg.webp.'.includes(needle);
+            gResult2 = '.mp3.mp4.webm.'.indexOf(needle) !== -1;
+            gResult3 = '.eot.otf.svg.ttf.woff.woff2.'.indexOf(needle) !== -1;
             })
-        .add('  -      /.../.test', function() {
-            gResult = /\.(?:ico|png|gif|jpg|jpeg|webp)$/.test(createNeedle());
+        .add('  -        /.../.test', function() {
+            var needle = createNeedle();
+            gResult1 = /\.(?:ico|png|gif|jpg|jpeg|webp)$/.test(needle);
+            gResult2 = /\.(?:mp3|mp4|webp)$/.test(needle);
+            gResult3 = /\.(?:eot|otf|svg|ttf|woff|woff2)$/.test(needle);
             })
-        .add('  -     RegExp.test', function() {
-            gResult = precompiledRegex.test(createNeedle());
+        .add('  -       RegExp.test', function() {
+            var needle = createNeedle();
+            gResult1 = precompiledRegex1.test(needle);
+            gResult2 = precompiledRegex2.test(needle);
+            gResult3 = precompiledRegex3.test(needle);
+            })
+        .add('  - RegExp.test(path)', function() {
+            var url = pickURL();
+            gResult1 = precompiledRegex1.test(url);
+            gResult2 = precompiledRegex2.test(url);
+            gResult3 = precompiledRegex3.test(url);
+            })
+        .add('  -           Map.get', function() {
+            gResult1 = precompiledMap.get(createNeedle());
             })
         .on('start', function() {
             stdout(gWhich, '');
