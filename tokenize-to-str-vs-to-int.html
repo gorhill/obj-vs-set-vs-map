@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body style="font: 14px sans-serif">
+<h1>Benchmark: String-based tokens vs. integer-based tokens</h1>
+<p>The benchmark consists in the tokenization of a list of 350 URLs.</p>
+<p><button id="runBenchmark">Run</button></p>
+<a href="https://github.com/gorhill/obj-vs-set-vs-map"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/38ef81f8aca64bb9a64448d0d70f1308ef5341ab/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png"></a>
+<h2>stdout</h2>
+<div id="results" style="white-space:pre;font-family:mono"></div>
+
+<script src="https://cdn.jsdelivr.net/lodash/4.17.2/lodash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/platform.js/1.3.3/platform.js"></script>
+<script src="https://cdn.jsdelivr.net/benchmarkjs/2.1.2/benchmark.js"></script>
+<script>
+var allURLs = [];
+
+
+var strBasedTokens = (function() {
+    var entries = new Array(2048);
+    for ( var i = 0; i < 2048; i++ ) {
+        entries[i] = {
+            beg: 0,
+            token: undefined
+        };
+    }
+    return entries;
+})();
+
+var reAnyToken = /[%0-9a-z]+/g;
+
+var strBasedTokenize = function(url) {
+    var tokens = strBasedTokens,
+        re = reAnyToken;
+    var matches, entry;
+    re.lastIndex = 0;
+    for ( var i = 0; i < 2047; i++ ) {
+        matches = re.exec(url);
+        if ( matches === null ) { break; }
+        entry = tokens[i];
+        entry.beg = matches.index;
+        entry.token = matches[0];
+    }
+    tokens[i].token = ''; // Sentinel
+};
+
+
+var intBasedTokens = [];
+
+var validTokenChars = (function() {
+    var uintArray = new Uint8Array(128),
+        validTokenChars = '0123456789%abcdefghijklmnopqrstuvwxyz.*';
+    i = validTokenChars.length;
+    while ( i-- ) {
+        var c = validTokenChars.charCodeAt(i);
+        uintArray[c] = i + 1;
+    }
+    return uintArray;
+})();
+
+var intBasedTokenize = function(url) {
+    var l = url.length;
+    if ( l === 0 ) { tokens[0] = 0; return; }
+    var i = 0, j = 0, v, n, ti, th,
+        tokens = intBasedTokens,
+        vtc = validTokenChars;
+    for (;;) {
+        for (;;) {
+            if ( i === l ) { tokens[j] = 0; return; }
+            v = vtc[url.charCodeAt(i++)];
+            if ( v !== 0 ) { break; }
+        }
+        n = 1; ti = i - 1; th = v;
+        for (;;) {
+            if ( i === l ) { break; }
+            v = vtc[url.charCodeAt(i++)];
+            if ( v === 0 ) { break; }
+            if ( n !== 8 ) {
+                th = th * 64 + v;
+                n += 1;
+            }
+        }
+        tokens[j++] = th;
+        tokens[j++] = ti;
+    }
+};
+
+function stdout(text) {
+    var r = document.querySelector('#results');
+    r.innerHTML = r.innerHTML + text;
+}
+
+function doBenchmark() {
+    document.getElementById('results').innerHTML = '';
+    stdout('Benchmarking, the higher ops/sec the better...\n\n');
+    stdout(Benchmark.platform.toString() + '.\n');
+    stdout('\n\n');
+    benchmarkSuite.run({ 'async': true });
+}
+
+function benchmarkCycleHandler(event) {
+    stdout(String(event.target) + '\n');
+}
+
+var benchmarkSuite = new Benchmark.Suite;
+benchmarkSuite
+    .add('- String-based tokens', function() {
+        var urls = allURLs;
+        for ( var i = 0, n = urls.length; i < n; i++ ) {
+            strBasedTokenize(urls[i]);
+        }
+    })
+    .add('- Int-based tokens', function() {
+        var urls = allURLs;
+        for ( var i = 0, n = urls.length; i < n; i++ ) {
+            intBasedTokenize(urls[i]);
+        }
+    })
+    .on('cycle', benchmarkCycleHandler)
+    .on('complete', function() {
+        stdout('\nDone.');
+    });
+
+
+window.onload = function() {
+    // Read huge list of words
+    var thelist = document.getElementById('thelist');
+    allURLs = thelist.childNodes[0].textContent.trim().split(/\s+/);
+    thelist = null;
+    document.getElementById('runBenchmark').onclick = function() {
+        doBenchmark();
+    };
+};
+</script>
+<!-- lists of URLs -->
+<div id="thelist" style="display:none"><!--
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/android-chrome-192x192.png
+https://motherboard-images.vice.com/content-images/contentimage/29039/1450794945391682.jpg?crop=1xw:0.75xh;center,center?resize=131.25:*
+https://motherboard-images.vice.com/content-images/contentimage/30760/1455912681991351.gif?crop=1xw:0.9994834710743802xh;center,center?resize=131.25:*
+https://video-images.vice.com/articles/58ffa9e01816a3416ef2fd85/lede/1493150752270-Screen-Shot-2017-04-25-at-40530-PM.png?crop=1xw:0.9680477528089888xh;center,center?resize=131.25:*
+https://video-images.vice.com/articles/5900b78822e66325ec929d6d/lede/1493220151960-Screen-Shot-2017-04-26-at-111841-AM.png?crop=1xw:0.9496497373029772xh;center,center?resize=131.25:*
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon-16x16.png
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon-32x32.png
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon-32x32.png
+https://motherboard.vice.com/en_us/article/nasa-space-weather-earth-cocoon-van-allen
+https://d5nxst8fruw4z.cloudfront.net/atrk.gif?frame_height=882&frame_width=1045&iframe=0&title=Humans%20Accidentally%20Made%20a%20Space%20Cocoon%20For%20Ourselves%20Out%20of%20Radio%20Waves%20-%20Motherboard&time=1495122910466&time_zone_offset=240&screen_params=1920x1080x24&java_enabled=0&cookie_enabled=1&ref_url=https%3A%2F%2Fnews.ycombinator.com%2F&host_url=https%3A%2F%2Fmotherboard.vice.com%2Fen_us%2Farticle%2Fnasa-space-weather-earth-cocoon-van-allen&random_number=18950676659&sess_cookie=5901538b15c1c44f70afb774052&sess_cookie_flag=0&user_cookie=5901538b15c1c44f70afb774052&user_cookie_flag=0&dynamic=true&domain=vice.com&account=x5HVh1aUXR00Gi&jsv=20130128&user_lang=en-GB
+https://motherboard.vice.com/__comscore
+https://d5nxst8fruw4z.cloudfront.net/atrk.gif?frame_height=882&frame_width=1045&iframe=0&title=What%20Keeps%20%E2%80%98The%20Handmaid%E2%80%99s%20Tale%E2%80%99%20Creators%20and%20Stars%20Up%20at%20Night%20-%20Motherboard&time=1495122909698&time_zone_offset=240&screen_params=1920x1080x24&java_enabled=0&cookie_enabled=1&ref_url=https%3A%2F%2Fnews.ycombinator.com%2F&host_url=https%3A%2F%2Fmotherboard.vice.com%2Fen_us%2Farticle%2Fhandmaids-tale-creators-stars-interview-dystopia&random_number=2679365465&sess_cookie=5901538b15c1c44f70afb774052&sess_cookie_flag=0&user_cookie=5901538b15c1c44f70afb774052&user_cookie_flag=0&dynamic=true&domain=vice.com&account=x5HVh1aUXR00Gi&jsv=20130128&user_lang=en-GB
+https://motherboard.vice.com/__comscore
+https://video-images.vice.com/articles/591c4138c563d8699a2c04ec/lede/1495024439943-33722065702_f8ce657b75_k.jpeg?crop=1xw:0.843956043956044xh;center,center?resize=131.25:*
+https://video-images.vice.com/articles/591b7eee26cd696ee06cf81d/lede/1494975369447-148121446922038.jpeg?crop=1xw:1xh;center,center?resize=131.25:*
+https://video-images.vice.com/articles/591c574e87068869b2270472/lede/1495030027400-32846133740_1542a0639e_k.jpeg?crop=1xw:0.8433382137628112xh;center,center?resize=131.25:*
+https://motherboard.vice.com/api/v1/topics/5886b6ea4e4993458da7343f/articles?locale=en_us&nsfw=false&per_page=6
+https://video-images.vice.com/articles/591b74c926cd696ee06cf743/lede/1494974089042-Screen-Shot-2017-05-16-at-62956-PM.png?crop=0.9928xw:0.9989xh;0.0036xw,0xh?resize=131.25:*
+https://images.vice.com/vice/images/contributor/meta/2016/02/04/sam-fragoso-1454598764.jpg?crop=1xw:1xh;center,center&resize=262.5:*
+https://video-images.vice.com/articles/591b5eeb84cd7b6ece152212/lede/1494968736620-HMT_102_GK_1101_0025rt.jpeg?crop=1xw:0.8447xh;0xw,0.0225xh&resize=1050:*
+https://video-images.vice.com/_uncategorized/1494970281159-BRUCEHEADSHOT-1.jpeg?resize=1050:*
+https://video-images.vice.com/_uncategorized/1494970208197-morano_reed_tht_0094.jpeg?resize=1050:*
+https://video-images.vice.com/_uncategorized/1494970134372-Max-Minghella-as-Nick_f.jpeg?resize=1050:*
+https://video-images.vice.com/_uncategorized/1494970032267-Samira-Wiley-as-Moira_f.jpeg?resize=1050:*
+https://www.youtube.com/embed/cFYoYUBGw4s?wmode=transparent&rel=0&autohide=1&showinfo=0&enablejsapi=1
+https://i.ytimg.com/vi_webp/cFYoYUBGw4s/sddefault.webp
+https://www.youtube.com/yts/jsbin/player-vfl8jhACg/en_GB/remote.js
+https://static.doubleclick.net/instream/ad_status.js
+https://www.google.com/js/bg/Raerjn9_PGQen-QPSfifapYrWoKb0BfXpXM2GcBk-14.js
+https://googleads.g.doubleclick.net/pagead/id
+https://www.youtube.com/yts/jsbin/player-vfl8jhACg/en_GB/base.js
+https://www.youtube.com/yts/jsbin/www-embed-player-vflLF2CWi/www-embed-player.js
+https://www.youtube.com/yts/cssbin/www-embed-player-webp-vflfLDFlR.css
+https://www.youtube.com/embed/cFYoYUBGw4s?wmode=transparent&rel=0&autohide=1&showinfo=0&enablejsapi=1
+https://s.ytimg.com/yts/jsbin/www-widgetapi-vfliWHxmV/www-widgetapi.js
+https://www.google-analytics.com/analytics.js
+https://www.google-analytics.com/analytics.js
+https://www.youtube.com/iframe_api
+https://www.youtube.com/embed/cFYoYUBGw4s?wmode=transparent&rel=0&autohide=1&showinfo=0&enablejsapi=1
+https://oembed.vice.com/ALrkPN1?playerjs=true&img=1
+https://oembed.vice.com/ALrkPN1?playerjs=true&img=1
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon.ico
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/coast-228x228.png
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/android-chrome-192x192.png
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon-16x16.png
+https://video-images.vice.com/videos/58/40/58406647464cde3c016db4b2/58406647464cde3c016db4b2-1489160552088.jpg?crop=1xw:1xh;center,center&resize=525:*
+https://vice-web-statics-cdn.vice.com/favicons/motherboard/favicon-32x32.png
+https://static.chartbeat.com/js/chartbeat.js
+https://js-agent.newrelic.com/nr-spa-1026.min.js
+https://motherboard.vice.com/api/v1/topics/591cb5611396d1363910cc21/videos?locale=en_us&per_page=1
+https://oembed.vice.com/ALrkPN1/thumbnail
+https://fast.fonts.net/t/1.css?apiType=css&projectid=6a7f8864-94a4-4b5c-99ce-45089336b6c1
+https://motherboard.vice.com/api/v1/videos?locale=en_us&per_page=12&page=1&nsfw=false
+https://motherboard.vice.com/api/v1/articles?locale=en_us&per_page=12&page=2&nsfw=false
+https://video-images.vice.com/articles/591cb54b23aa62394a116b7e/lede/1495053644261-170517111622_1_900x600.jpeg?crop=1xw:0.8937644341801386xh;center,center&resize=1050:*
+https://lh5.ggpht.com//3aP4V6wCNtmEn3Ujuws6X3JMXwTLZS_y8LMX8Jm0ChD2qNhNLi3jSYYoKXyQH_f8FB6De1O8EKTHLbgteoiXlO93awENVHYjnAqp?crop=1xw:1xh;center,center&resize=262.5:*
+https://oembed.vice.com/embed.js
+https://d5nxst8fruw4z.cloudfront.net/atrk.gif?frame_height=882&frame_width=1045&iframe=0&title=Humans%20Accidentally%20Made%20a%20Space%20Cocoon%20For%20Ourselves%20Out%20of%20Radio%20Waves%20-%20Motherboard&time=1495122900747&time_zone_offset=240&screen_params=1920x1080x24&java_enabled=0&cookie_enabled=1&ref_url=https%3A%2F%2Fnews.ycombinator.com%2F&host_url=https%3A%2F%2Fmotherboard.vice.com%2Fen_us%2Farticle%2Fnasa-space-weather-earth-cocoon-van-allen%3Futm_source%3Dmbtwitter&random_number=1519538466&sess_cookie=5901538b15c1c44f70afb774052&sess_cookie_flag=1&user_cookie=5901538b15c1c44f70afb774052&user_cookie_flag=1&dynamic=true&domain=vice.com&account=x5HVh1aUXR00Gi&jsv=20130128&user_lang=en-GB
+https://vice-web-statics-cdn.vice.com/fonts/mtiFontTrackingCode.js
+https://securepubads.g.doubleclick.net/gpt/pubads_impl_118.js
+https://vice-sundry-assets-cdn.vice.com/sites/web-assets/fonts/motherboard/98052579-0648-4e02-953f-ba7b46d13355.woff2
+https://sb.scorecardresearch.com/beacon.js
+https://sb.scorecardresearch.com/beacon.js
+https://d31qbv1cthcecs.cloudfront.net/atrk.js
+https://secure.quantserve.com/quant.js
+https://cdn.krxd.net/controltag?confid=JLnYmGrt
+https://video-images.vice.com/articles/591cb54b23aa62394a116b7e/lede/1495053644261-170517111622_1_900x600.jpeg
+https://vice-publishers-cdn.vice.com/AT_CH/OEWA/oewa_pixel_updated.js
+https://platform.twitter.com/widgets.js
+https://js-sec.indexww.com/ht/p/184607-260972712138262.js
+https://secure-au.imrworldwide.com/v60.js
+https://vice-web-statics-cdn.vice.com/static/motherboard.6fc6070759bebcfe715a.js
+https://vice-web-statics-cdn.vice.com/static/common.e6c43b6364af9de60c0e.js
+https://vice-web-statics-cdn.vice.com/static/assets.c43cde4e558b9faf4e76.js
+https://vice-web-statics-cdn.vice.com/static/vendor.071bf80ded340c83c6da.js
+https://www.google-analytics.com/analytics.js
+https://www.google-analytics.com/analytics.js
+https://www.googletagservices.com/tag/js/gpt.js
+https://vice-useast.gscontxt.net/main/channels.fcgi?url=https%3A%2F%2Fmotherboard.vice.com%2Fen_us%2Farticle%2Fnasa-space-weather-earth-cocoon-van-allen%3Futm_source%3Dmbtwitter
+https://vice-sundry-assets-cdn.vice.com/sites/web-assets/js/intl-messageformat-with-locales.min.js
+https://advice-ads-cdn.vice.com/DE/viceIVW-CS.js
+https://platform.instagram.com/en_US/embeds.js
+https://native.sharethrough.com/assets/sfp.js
+https://vice-d.openx.net/w/1.0/jstag?nc=16916245-motherboard
+https://vice-web-statics-cdn.vice.com/static/motherboard.6fc6070759bebcfe715a.css
+https://fonts.googleapis.com/css?family=Open+Sans:400,400i,700,700i
+https://motherboard.vice.com/en_us/article/nasa-space-weather-earth-cocoon-van-allen?utm_source=mbtwitter
+https://motherboard.vice.com/en_us/article/nasa-space-weather-earth-cocoon-van-allen?utm_source=mbtwitter
+https://motherboard.vice.com/en_us/article/nasa-space-weather-earth-cocoon-van-allen?utm_source=mbtwitter
+http://clients1.google.com/generate_204
+http://cse.google.com/adsense/search/async-ads.js
+http://cdn.static-economist.com/sites/default/files/econfinal_favicon.ico
+https://www.google-analytics.com/analytics.js
+https://www.google-analytics.com/analytics.js
+https://cdn.static-economist.com/sites/default/files/marketing/engagement/subscribe-espresso2.png
+https://cdn.static-economist.com/sites/default/files/marketing/engagement/subscribe-headphones3.png
+https://cdn.static-economist.com/sites/default/files/marketing/engagement/Overlay_mobile_image3.png
+https://cdn.static-economist.com/sites/default/files/images/espresso/subscribe-laptop.gif
+https://cdn.static-economist.com/assets/ecosans-reg--962e863d7796534aa543fbb914e5a1fcfe630848--.woff2
+https://www.google-analytics.com/analytics.js
+https://www.google-analytics.com/analytics.js
+https://buy.tinypass.com/_sam/js/jquery-1.7.1.min,/js/mother-2.0,/js/jquery-postmessage.min,/js/lodash.min,/libs/angular-1.2.22/angular.min,/libs/angular-1.2.22/angular-sanitize.min,/libs/angular-1.2.22/angular-animate.min,/libs/angular-moment/2.4.0/moment.min,/libs/angular-moment/2.4.0/angular-moment.min,/libs/angular-1.2.22/angular-placeholder.min,/libs/angular-1.2.22/angular-cookies.min,/libs/angular-dynamic-locale/tmhDynamicLocale,/libs/tinypass/i18n,/libs/angular-ui/ui-utils/0.0.4/ui-utils.min,/libs/angular-ui/ui-router/0.2.10/angular-ui-router.min,/libs/tinypass/services-1.2,/libs/tinypass/i18n,/widget/common/1.0/js/generalModule,/widget/common/1.0/js/tpComponentsModule,/widget/common/1.0/js/userService,/widget/common/1.0/js/containerService,/widget/showtemplate/1.0/js/showTemplate.js?v=9.5.53
+https://buy.tinypass.com/_sam/js/jquery-1.7.1.min,/js/mother-2.0,/js/jquery-postmessage.min,/js/lodash.min,/libs/angular-1.2.22/angular.min,/libs/angular-1.2.22/angular-sanitize.min,/libs/angular-1.2.22/angular-animate.min,/libs/angular-moment/2.4.0/moment.min,/libs/angular-moment/2.4.0/angular-moment.min,/libs/angular-1.2.22/angular-placeholder.min,/libs/angular-1.2.22/angular-cookies.min,/libs/angular-dynamic-locale/tmhDynamicLocale,/libs/tinypass/i18n,/libs/angular-ui/ui-utils/0.0.4/ui-utils.min,/libs/angular-ui/ui-router/0.2.10/angular-ui-router.min,/libs/tinypass/services-1.2,/libs/tinypass/i18n,/widget/common/1.0/js/generalModule,/widget/common/1.0/js/tpComponentsModule,/widget/common/1.0/js/userService,/widget/common/1.0/js/containerService,/widget/showtemplate/1.0/js/showTemplate.js?v=9.5.53
+https://buy.tinypass.com/_sam/js/jquery-1.7.1.min,/js/mother-2.0,/js/jquery-postmessage.min,/js/lodash.min,/libs/angular-1.2.22/angular.min,/libs/angular-1.2.22/angular-sanitize.min,/libs/angular-1.2.22/angular-animate.min,/libs/angular-moment/2.4.0/moment.min,/libs/angular-moment/2.4.0/angular-moment.min,/libs/angular-1.2.22/angular-placeholder.min,/libs/angular-1.2.22/angular-cookies.min,/libs/angular-dynamic-locale/tmhDynamicLocale,/libs/tinypass/i18n,/libs/angular-ui/ui-utils/0.0.4/ui-utils.min,/libs/angular-ui/ui-router/0.2.10/angular-ui-router.min,/libs/tinypass/services-1.2,/libs/tinypass/i18n,/widget/common/1.0/js/generalModule,/widget/common/1.0/js/tpComponentsModule,/widget/common/1.0/js/userService,/widget/common/1.0/js/containerService,/widget/showtemplate/1.0/js/showTemplate.js?v=9.5.53
+https://buy.tinypass.com/libs/tinypass/i18n.css
+https://buy.tinypass.com/checkout/template/show?displayMode=inline&containerSelector=%23piano__fixed-subscription-ribbon&templateId=OTRMPTW0YGCD&offerId=fakeOfferId&trackingId=%7Bjcx%7DH4sIAAAAAAAAAIWQXWvCMBiF_0uufaFJm6bxTtT5AW5OijrHLt6kb7tstQZbrTD231dlDAaDXZ_nOQfOB0OXsT4bFlRtj_5YTFmPeSxo7aidXRMRcAWBBJ4A5yAFhDHwUMKibe91OJrP1-3uPZtuQdtcyURTnmsZRqjiJDM6iywqI9Fg3BXTxdPRUWVpfCF7atyhum1YpQPMAwFc2RgiGQkwmiQEqAgN10gGf-kD--PWr4c2pb0vsaGhGC_1eDXQi8FEyM6ofemalOqmnmU16z-_9Fjzzd7kh3S1WKab4GkyHHW4xb1HV1QdWp3KssfOrnbNjTzD30ckcNp5v3prTCg2j-fDXfv_EZ9fe8NUhXYBAAA&experienceId=EXGAWBSDHCZL&tbc=%7Bjbd%7DeyJ2IjoyLCJwayI6InpwQ254b1lMUUJscHlZZEdycFdOY2ZOcXJ5WkREZUV3b1poY3l0SUVNYmdpS1UwMTYxZ2I3RlV4SlZYTyJ9&iframeId=offer-0-PpzLE&url=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&parentDualScreenLeft=816&parentDualScreenTop=48&parentWidth=1045&parentHeight=882&parentOuterHeight=992&aid=CgenXrprgH&customVariables=%7B%22url%22%3A%22http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8%22%2C%22userType%22%3A%22anonymous%22%2C%22isMultiUserLicense%22%3Afalse%2C%22isArticle%22%3Atrue%2C%22followPaywall%22%3Afalse%2C%22campaign%22%3Anull%2C%22price%22%3A%2212+weeks+for+%2412%22%2C%22price_slide%22%3A%22Welcome+to+The+Economist.+Subscribe+today+to+take+advantage+of+our+introductory+offers+and+enjoy+12+weeks%27+access+for+just+%241+per+week.%22%7D&isUserValid=false&isCheckoutCalledFirst=false&pageViewId=2017-05-18-11-52-36-135-MwwN93DJJVwZkdHX-9cf7589eff9534a768db9d4ca7b5aba6&visitId=v-2017-05-18-11-52-36-138-uZppRjtb32WQvoFw-9cf7589eff9534a768db9d4ca7b5aba6&userProvider=publisher_user_ref&userToken=&hasLoginRequiredCallback=true&singleContainer=%5Bobject+HTMLDivElement%5D&width=1030&_qh=2722006895
+https://buy.tinypass.com/_sam/js/jquery-1.7.1.min,/js/mother-2.0,/js/jquery-postmessage.min,/js/lodash.min,/libs/angular-1.2.22/angular.min,/libs/angular-1.2.22/angular-sanitize.min,/libs/angular-1.2.22/angular-animate.min,/libs/angular-moment/2.4.0/moment.min,/libs/angular-moment/2.4.0/angular-moment.min,/libs/angular-1.2.22/angular-placeholder.min,/libs/angular-1.2.22/angular-cookies.min,/libs/angular-dynamic-locale/tmhDynamicLocale,/libs/tinypass/i18n,/libs/angular-ui/ui-utils/0.0.4/ui-utils.min,/libs/angular-ui/ui-router/0.2.10/angular-ui-router.min,/libs/tinypass/services-1.2,/libs/tinypass/i18n,/widget/common/1.0/js/generalModule,/widget/common/1.0/js/tpComponentsModule,/widget/common/1.0/js/userService,/widget/common/1.0/js/containerService,/widget/showtemplate/1.0/js/showTemplate.js?v=9.5.53
+https://buy.tinypass.com/libs/tinypass/i18n.css
+https://buy.tinypass.com/widget/showtemplate/1.0/css/showTemplate.css
+http://www.google-analytics.com/analytics.js
+http://www.google-analytics.com/analytics.js
+https://buy.tinypass.com/checkout/template/show?displayMode=inline&containerSelector=%23piano__subscription-ribbon&templateId=OT7LBNS9QEOP&offerId=fakeOfferId&trackingId=%7Bjcx%7DH4sIAAAAAAAAAIWQXU_CMBiF_0uveZN1W9eVO1EMED4EERHjxdvu3ayO0bDCSIj_3UmMiYmJ1-d5zknOmaHNWJddF1St925fDFiHOSxoZakZfiVhwCUEAngKnIMIIUqARwImTTNV0c1otGo279lgDcrkUqSK8lyJKEaZpJlWWWxQaoEak7aYTo72lipD_ROZg7e76rJhpAowD0Lg0iQQizgErUhAgJJQc4Wk8Zd-ZX7c-nXXLGnrSvSUTh74RvSe-tF4EcrWqF1p_ZJqXw-zmnWfXzrMf7MXebaU4970Xs37s7sWN7h1aIuqRatDWXbY0dbWX8gj_H1ECoeNc4s3r6PwcX7c3Tb_H_HxCeug3uR2AQAA&experienceId=EXGAWBSDHCZL&tbc=%7Bjbd%7DeyJ2IjoyLCJwayI6InpwQ254b1lMUUJscHlZZEdycFdOY2ZOcXJ5WkREZUV3b1poY3l0SUVNYmdpS1UwMTYxZ2I3RlV4SlZYTyJ9&iframeId=offer-1-eSeZE&url=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&parentDualScreenLeft=816&parentDualScreenTop=48&parentWidth=1045&parentHeight=882&parentOuterHeight=992&aid=CgenXrprgH&customVariables=%7B%22url%22%3A%22http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8%22%2C%22userType%22%3A%22anonymous%22%2C%22isMultiUserLicense%22%3Afalse%2C%22isArticle%22%3Atrue%2C%22followPaywall%22%3Afalse%2C%22campaign%22%3Anull%2C%22price%22%3A%2212+weeks+for+%2412%22%2C%22price_slide%22%3A%22Welcome+to+The+Economist.+Subscribe+today+to+take+advantage+of+our+introductory+offers+and+enjoy+12+weeks%27+access+for+just+%241+per+week.%22%7D&isUserValid=false&isCheckoutCalledFirst=false&pageViewId=2017-05-18-11-52-36-135-MwwN93DJJVwZkdHX-9cf7589eff9534a768db9d4ca7b5aba6&visitId=v-2017-05-18-11-52-36-138-uZppRjtb32WQvoFw-9cf7589eff9534a768db9d4ca7b5aba6&userProvider=publisher_user_ref&userToken=&hasLoginRequiredCallback=true&singleContainer=%5Bobject+HTMLDivElement%5D&width=1030&_qh=3691070310
+https://buy.tinypass.com/checkout/template/show?displayMode=inline&containerSelector=%23piano__subscription-ribbon&templateId=OT7LBNS9QEOP&offerId=fakeOfferId&trackingId=%7Bjcx%7DH4sIAAAAAAAAAIWQXU_CMBiF_0uveZN1W9eVO1EMED4EERHjxdvu3ayO0bDCSIj_3UmMiYmJ1-d5zknOmaHNWJddF1St925fDFiHOSxoZakZfiVhwCUEAngKnIMIIUqARwImTTNV0c1otGo279lgDcrkUqSK8lyJKEaZpJlWWWxQaoEak7aYTo72lipD_ROZg7e76rJhpAowD0Lg0iQQizgErUhAgJJQc4Wk8Zd-ZX7c-nXXLGnrSvSUTh74RvSe-tF4EcrWqF1p_ZJqXw-zmnWfXzrMf7MXebaU4970Xs37s7sWN7h1aIuqRatDWXbY0dbWX8gj_H1ECoeNc4s3r6PwcX7c3Tb_H_HxCeug3uR2AQAA&experienceId=EXGAWBSDHCZL&tbc=%7Bjbd%7DeyJ2IjoyLCJwayI6InpwQ254b1lMUUJscHlZZEdycFdOY2ZOcXJ5WkREZUV3b1poY3l0SUVNYmdpS1UwMTYxZ2I3RlV4SlZYTyJ9&iframeId=offer-1-eSeZE&url=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&parentDualScreenLeft=816&parentDualScreenTop=48&parentWidth=1045&parentHeight=882&parentOuterHeight=992&aid=CgenXrprgH&customVariables=%7B%22url%22%3A%22http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8%22%2C%22userType%22%3A%22anonymous%22%2C%22isMultiUserLicense%22%3Afalse%2C%22isArticle%22%3Atrue%2C%22followPaywall%22%3Afalse%2C%22campaign%22%3Anull%2C%22price%22%3A%2212+weeks+for+%2412%22%2C%22price_slide%22%3A%22Welcome+to+The+Economist.+Subscribe+today+to+take+advantage+of+our+introductory+offers+and+enjoy+12+weeks%27+access+for+just+%241+per+week.%22%7D&isUserValid=false&isCheckoutCalledFirst=false&pageViewId=2017-05-18-11-52-36-135-MwwN93DJJVwZkdHX-9cf7589eff9534a768db9d4ca7b5aba6&visitId=v-2017-05-18-11-52-36-138-uZppRjtb32WQvoFw-9cf7589eff9534a768db9d4ca7b5aba6&userProvider=publisher_user_ref&userToken=&hasLoginRequiredCallback=true&singleContainer=%5Bobject+HTMLDivElement%5D&width=1030&_qh=3691070310
+https://buy.tinypass.com/checkout/template/show?displayMode=inline&containerSelector=%23piano__fixed-subscription-ribbon&templateId=OTRMPTW0YGCD&offerId=fakeOfferId&trackingId=%7Bjcx%7DH4sIAAAAAAAAAIWQXWvCMBiF_0uufaFJm6bxTtT5AW5OijrHLt6kb7tstQZbrTD231dlDAaDXZ_nOQfOB0OXsT4bFlRtj_5YTFmPeSxo7aidXRMRcAWBBJ4A5yAFhDHwUMKibe91OJrP1-3uPZtuQdtcyURTnmsZRqjiJDM6iywqI9Fg3BXTxdPRUWVpfCF7atyhum1YpQPMAwFc2RgiGQkwmiQEqAgN10gGf-kD--PWr4c2pb0vsaGhGC_1eDXQi8FEyM6ofemalOqmnmU16z-_9Fjzzd7kh3S1WKab4GkyHHW4xb1HV1QdWp3KssfOrnbNjTzD30ckcNp5v3prTCg2j-fDXfv_EZ9fe8NUhXYBAAA&experienceId=EXGAWBSDHCZL&tbc=%7Bjbd%7DeyJ2IjoyLCJwayI6InpwQ254b1lMUUJscHlZZEdycFdOY2ZOcXJ5WkREZUV3b1poY3l0SUVNYmdpS1UwMTYxZ2I3RlV4SlZYTyJ9&iframeId=offer-0-PpzLE&url=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&parentDualScreenLeft=816&parentDualScreenTop=48&parentWidth=1045&parentHeight=882&parentOuterHeight=992&aid=CgenXrprgH&customVariables=%7B%22url%22%3A%22http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8%22%2C%22userType%22%3A%22anonymous%22%2C%22isMultiUserLicense%22%3Afalse%2C%22isArticle%22%3Atrue%2C%22followPaywall%22%3Afalse%2C%22campaign%22%3Anull%2C%22price%22%3A%2212+weeks+for+%2412%22%2C%22price_slide%22%3A%22Welcome+to+The+Economist.+Subscribe+today+to+take+advantage+of+our+introductory+offers+and+enjoy+12+weeks%27+access+for+just+%241+per+week.%22%7D&isUserValid=false&isCheckoutCalledFirst=false&pageViewId=2017-05-18-11-52-36-135-MwwN93DJJVwZkdHX-9cf7589eff9534a768db9d4ca7b5aba6&visitId=v-2017-05-18-11-52-36-138-uZppRjtb32WQvoFw-9cf7589eff9534a768db9d4ca7b5aba6&userProvider=publisher_user_ref&userToken=&hasLoginRequiredCallback=true&singleContainer=%5Bobject+HTMLDivElement%5D&width=1030&_qh=2722006895
+http://sp.analytics.yahoo.com/sp.pl?a=10000&jsonp=YAHOO.ywa.I13N.handleJSONResponse&d=Thu%2C%2018%20May%202017%2015%3A52%3A36%20GMT&n=4d&b=The%20Economist%20explains%3A%20Why%20Harvard%20Business%20School%20is%20under%20fire%20%7C%20The%20Economist&.yp=10008246&f=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&e=https%3A%2F%2Fnews.ycombinator.com%2F&enc=UTF-8&et=custom
+http://tags.bluekai.com/site/18452?ret=html&phint=p1%3Dblogs_the_economist_explains&phint=p3%3Dweb&phint=p4%3Dblog_post&phint=p5%3Dblog%7Cwhy_harvard_business_school_is_under_fire&phint=p8%3D10%3A30AM&phint=p9%3D4&phint=p10%3D18%20may%202017%7Cthursday%7Cweekday&phint=p11%3Dnot_logged_in&phint=p13%3Danonymous%7Cnone&phint=did%3D0&phint=p41%3DFMSQ&phint=p42%3Decoexp&phint=events%3Devent2&phint=chan%3Dblogs&phint=page%3Dblog%7Cthe_economist_explains%7Cwhy_harvard_business_school_is_under_fire&phint=__bk_pr%3Dhttps%3A%2F%2Fnews.ycombinator.com%2F&phint=p30%3Drevamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&phint=__bk_t%3DThe%20Economist%20explains%3A%20Why%20Harvard%20Business%20School%20is%20under%20fire%20%7C%20The%20Economist&phint=__bk_k%3D&phint=__bk_pr%3Dhttps%3A%2F%2Fnews.ycombinator.com%2F&phint=__bk_l%3Dhttp%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&limit=&r=95791237
+http://t.myvisualiq.net/activity_pixel?pt=i&et=a&r=&ago=212&ao=676&px=504&ord=01&revenue=01&u1=FTVConversions
+http://api.adsymptotic.com/api/s/trackconversion?_pid=12871&_psign=81beadeefa4ab371313fc2e2194c6e3a&_aid=12871&_lbl=RT_Economist_RT_Homepage&_rnd=0.48201169983670344
+http://api.adsymptotic.com/api/s/trackconversion?_pid=12871&_psign=81beadeefa4ab371313fc2e2194c6e3a&_aid=3358&_lbl=CT&_pc_ev_tp=Landing_Page&_rnd=0.8054856704068014
+http://aax-eu.amazon-adsystem.com/s/iui3?d=forester-did&ex-fargs=%3Fid%3Df0efbbac-8fc9-89c2-4a02-dfbffcb79f27%26type%3D55%26m%3D3&ex-fch=416613&ex-src=www.economist.com/topics/united-kingdom&ex-hargs=v%3D1.0%3Bc%3D2854784830602%3Bp%3DF0EFBBAC-8FC9-89C2-4A02-DFBFFCB79F27
+http://googleads.g.doubleclick.net/pagead/viewthroughconversion/878169251/?value=0&guid=ON&script=0
+http://googleads.g.doubleclick.net/pagead/viewthroughconversion/878230899/?value=0&guid=ON&script=0
+http://googleads.g.doubleclick.net/pagead/viewthroughconversion/877792708/?value=0&guid=ON&script=0
+http://js.bizographics.com/insight.min.js
+http://platform.twitter.com/oct.js
+http://4683316.fls.doubleclick.net/activityi;src=4683316;type=eco_web;cat=eco_wreg;ord=4898442419543.676?
+http://4683316.fls.doubleclick.net/activityi;src=4683316;type=eco_web;cat=eco_hp;ord=1677853771180.2554?
+http://4683316.fls.doubleclick.net/activityi;src=4683316;type=eco_web;cat=eco_art;ord=9684626900209.232?
+https://connect.facebook.net/en_US/fbevents.js
+http://4978775.fls.doubleclick.net/activityi;src=4978775;type=aa;cat=econo0;ord=505867451051.8757?
+http://secure.img-cdn.mediaplex.com/0/29307/universal.html?page_name=theeconomist_yodel_rtg&TheEconomist_Yodel_RTG=1&mpuid=
+http://www.googleadservices.com/pagead/conversion_async.js
+https://s.yimg.com/wi/ytc.js
+http://collector-1064.tvsquared.com/piwik/piwik.js
+http://vt.myvisualiq.net/2/ibr3JEScKG%2BEHofxcnTp5Q%3D%3D/vt-114.js
+http://www.googletagmanager.com/gtm.js?id=GTM-5VW9P8V&l=dataLayer
+http://static.chartbeat.com/js/chartbeat.js
+http://w.usabilla.com/765c73bcbb12.js?lv=1
+https://api.lytics.io/api/tag/2215/lio.js
+http://tags.tiqcdn.com/utag/tiqapp/utag.v.js?a=teg/unicorn/201705111807&cb=1495122756192
+https://experience.tinypass.com/xbuilder/experience/execute
+http://api-v3.tinypass.com/api/v3/page/track?page_session_id=s-2017-05-18-11-52-36-110-6ThZ3Q8HkSblJut6-9cf7589eff9534a768db9d4ca7b5aba6&track_count=1&pageview_id=2017-05-18-11-52-36-110-NQit2todT6yH0eNs-9cf7589eff9534a768db9d4ca7b5aba6&referer=https%3A%2F%2Fnews.ycombinator.com%2F&url=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&fingerprint=93bc20ef0e3f04c3b1c9a9974b36137b&old_fingerprint=&adblocker=0&timezone_offset=-240&submit_type=auto&multiple_page_track_init=false&visit_id=v-2017-05-18-11-52-36-123-h6S73iWFkff3i9nB-9cf7589eff9534a768db9d4ca7b5aba6&new_visit=true&custom_params=%7B%22request%22%3A%7B%22url%22%3A%5B%22%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8%22%5D%7D%7D&aid=CgenXrprgH&user_provider=publisher_user_ref&user_token=&callback=jQuery171006296461297716438_1495122756000&_=1495122756127
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.58.js?utv=ut4.39.201704101059
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.56.js?utv=ut4.39.201703292031
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.53.js?utv=ut4.39.201702221652
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.52.js?utv=ut4.39.201702221652
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.47.js?utv=ut4.39.201705111807
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.46.js?utv=ut4.39.201705111807
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.42.js?utv=ut4.39.201705111807
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.41.js?utv=ut4.39.201705111807
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.40.js?utv=ut4.39.201705111807
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.45.js?utv=ut4.39.201702011851
+http://clients1.google.com/generate_204
+https://www.google.com/cse/static/images/1x/googlelogo_grey_46x15dp.png
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.44.js?utv=ut4.39.201702011851
+http://cse.google.com/adsense/search/async-ads.js
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.43.js?utv=ut4.39.201702011851
+https://www.googleapis.com/generate_204
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.38.js?utv=ut4.39.201702011851
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.37.js?utv=ut4.39.201702011851
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.36.js?utv=ut4.39.201702011851
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.35.js?utv=ut4.39.201702011851
+https://www.google.com/uds/api/search/1.0/890e228675e68570fa203500d9572ad4/default+en.I.js
+https://www.google.com/cse/static/style/look/minimalist.css
+https://www.google.com/uds/api/search/1.0/890e228675e68570fa203500d9572ad4/default+en.css
+http://www.economist.com/_Incapsula_Resource?SWKMTFSR=1&e=0.26015704061244405
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.27.js?utv=ut4.39.201702011851
+http://stats.economist.com/b/ss/economistcomprod/1/H.25.4/s79874257962713?AQB=1&ndh=1&t=18%2F4%2F2017%2011%3A52%3A35%204%20240&fid=6C5C0BA6F090B98A-3237768B517ED90B&ce=UTF-8&ns=economist&pageName=blog%7Cthe_economist_explains%7Cwhy_harvard_business_school_is_under_fire&g=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&r=https%3A%2F%2Fnews.ycombinator.com%2F&c.&subsection=the_economist_explains&revampid=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&.c&cc=USD&ch=blogs&server=www.economist.com&events=event2&c1=blogs_the_economist_explains&v1=blogs_the_economist_explains&c3=web&v3=web&c4=blog_post&v4=blog_post&c5=blog%7Cwhy_harvard_business_school_is_under_fire&v5=blog%7Cwhy_harvard_business_school_is_under_fire&c8=10%3A30AM&v8=10%3A30AM&c9=4&v9=4&c10=18%20may%202017%7Cthursday%7Cweekday&v10=18%20may%202017%7Cthursday%7Cweekday&c11=not_logged_in&v11=not_logged_in&c13=anonymous%7Cnone&v13=anonymous%7Cnone&c14=news.ycombinator.com&v14=news.ycombinator.com&v23=o%2Foth%2Fnews.ycombinator.com%2Fnone%2Fnone%2Fnone%2Fearned%2F201751811%3A52%2Fother%20ref%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone&c30=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&v30=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&c31=2017%7C05%7C17&v31=2017%7C05%7C17&c32=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&v32=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&c41=FMSQ&v41=FMSQ&c42=ecoexp&v42=ecoexp&c50=other%20ref&v50=other%20ref&c65=o%2Foth%2Fnews.ycombinator.com%2Fnone%2Fnone%2Fnone%2Fearned%2F201751811%3A52%2Fother%20ref%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone&s=1920x1080&c=24&j=1.6&v=N&k=Y&bw=1045&bh=882&p=Chrome%20PDF%20Viewer%3BWidevine%20Content%20Decryption%20Module%3BNative%20Client%3B&AQE=1
+http://stats.economist.com/b/ss/economistcomprod/1/H.25.4/s79874257962713?AQB=1&ndh=1&t=18%2F4%2F2017%2011%3A52%3A35%204%20240&fid=6C5C0BA6F090B98A-3237768B517ED90B&ce=UTF-8&ns=economist&pageName=blog%7Cthe_economist_explains%7Cwhy_harvard_business_school_is_under_fire&g=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&r=https%3A%2F%2Fnews.ycombinator.com%2F&c.&subsection=the_economist_explains&revampid=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&.c&cc=USD&ch=blogs&server=www.economist.com&events=event2&c1=blogs_the_economist_explains&v1=blogs_the_economist_explains&c3=web&v3=web&c4=blog_post&v4=blog_post&c5=blog%7Cwhy_harvard_business_school_is_under_fire&v5=blog%7Cwhy_harvard_business_school_is_under_fire&c8=10%3A30AM&v8=10%3A30AM&c9=4&v9=4&c10=18%20may%202017%7Cthursday%7Cweekday&v10=18%20may%202017%7Cthursday%7Cweekday&c11=not_logged_in&v11=not_logged_in&c13=anonymous%7Cnone&v13=anonymous%7Cnone&c14=news.ycombinator.com&v14=news.ycombinator.com&v23=o%2Foth%2Fnews.ycombinator.com%2Fnone%2Fnone%2Fnone%2Fearned%2F201751811%3A52%2Fother%20ref%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone&c30=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&v30=revamp_ecom%7C0216%2Frevamp%2Ffe-blogs-j-842%0A%2Fb%2F100.00%2Fb&c31=2017%7C05%7C17&v31=2017%7C05%7C17&c32=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&v32=http%3A%2F%2Fwww.economist.com%2Fblogs%2Feconomist-explains%2F2017%2F05%2Feconomist-explains-8&c41=FMSQ&v41=FMSQ&c42=ecoexp&v42=ecoexp&c50=other%20ref&v50=other%20ref&c65=o%2Foth%2Fnews.ycombinator.com%2Fnone%2Fnone%2Fnone%2Fearned%2F201751811%3A52%2Fother%20ref%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone%2Fnone&s=1920x1080&c=24&j=1.6&v=N&k=Y&bw=1045&bh=882&p=Chrome%20PDF%20Viewer%3BWidevine%20Content%20Decryption%20Module%3BNative%20Client%3B&AQE=1
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.55.js?utv=ut4.39.201703292031
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.48.js?utv=ut4.39.201702021631
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.21.js?utv=ut4.39.201608221723
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.5.js?utv=ut4.39.201702171501
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.25.js?utv=ut4.39.201702011851
+https://www.google.com/jsapi?autoload=%7B%22modules%22%3A%5B%7B%22name%22%3A%22search%22%2C%22version%22%3A%221.0%22%2C%22callback%22%3A%22__gcse.scb%22%2C%22style%22%3A%22https%3A%2F%2Fwww.google.com%2Fcse%2Fstatic%2Fstyle%2Flook%2Fminimalist.css%22%2C%22language%22%3A%22en%22%7D%5D%7D
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.13.js?utv=ut4.39.201611281814
+http://cdn.tinypass.com/api/tinypass.min.js
+http://www.npttech.com/advertising.js
+http://www.npttech.com/advertising.js
+https://securepubads.g.doubleclick.net/gpt/pubads_impl_118.js
+http://www.economist.com/_Incapsula_Resource?SWJIYLWA=2977d8d74f63d7f8fedbea018b7a1d05&ns=1
+http://service.maxymiser.net/cdn/economist/js/mmcore.js
+http://cdn.static-economist.com/assets/css/print-bundle--e800782b73ea4df94d1a223c42fb36cc35b176da--.css
+http://static.hotjar.com/c/hotjar-206062.js?sv=5
+http://dashboard.tinypass.com/xbuilder/experience/load?aid=CgenXrprgH
+http://tags.tiqcdn.com/utag/teg/unicorn/prod/utag.js
+http://cdn.static-economist.com/assets/omniture_h254.min--2a227ab3dc72013b38479058f47d47810844211f--.js
+https://cse.google.com/cse.js?cx=013751040265774567329:ylv-hrexwbc
+http://consent.truste.com/notice?domain=economist.com&c=teconsent-preferences&text=true
+http://www.googletagservices.com/tag/js/gpt.js
+http://cdn.static-economist.com/assets/econsans-it--eede9f5c3604f66cd3b417cefcd86d626c05fded--.woff2
+http://cdn.static-economist.com/assets/milo-rg--12cb118e89c8f4aac44285a5d827d3f8cecb68e0--.woff2
+http://cdn.static-economist.com/assets/econsans-md--36046bbaa3197fdb03d8d162abc8b6dfbb81e639--.woff2
+http://cdn.static-economist.com/assets/milo-it--936a70711ade5860e59531a9f9501a00e06b0dc2--.woff2
+http://cdn.static-economist.com/assets/milo-md--6a91f04e782d6f6822dc095279ac79edb60c76d8--.woff2
+http://www.economist.com/assets/js/app--6fc0933abbad093482693cac71f7b62dd26d6c44--.js
+http://cdn.static-economist.com/sites/default/files/imagecache/1872-width/20170520_BLP514.jpg
+http://cdn.static-economist.com/assets/econsans-lt--8faed28eb3c55ebd02de1b998149d3db7224c71a--.woff2
+http://cdn.static-economist.com/assets/econsans-bd--b9df93f3c21db45b246fb26b9e34c17708adf920--.woff2
+http://cdn.static-economist.com/assets/econsans-rg--33a508b17708864643ededa7c134d7e08b3487c6--.woff2
+http://www.economist.com/assets/icons--33fb586b88d14cf55598686375498cac05d9f8cc--.svg#economist
+http://js-sec.indexww.com/ht/p/184475-137819213763014.js
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+http://www.economist.com/blogs/economist-explains/2017/05/economist-explains-8
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iRLa8MibPVhs/v3/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iFFEFjLIwm5g/v3/800x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iidPcZ._5jn8/v0/800x-1.png
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ivBaQtwlwvVA/v1/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iRLa8MibPVhs/v3/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iFFEFjLIwm5g/v3/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iidPcZ._5jn8/v0/60x-1.png
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ivBaQtwlwvVA/v1/150x-1.jpg
+https://assets.bwbx.io/s3/javelin/public/javelin/images/markets-logo-190c54e63b.svg
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/full_width/image/text_above/text_above-43bd8786da.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/full_width/image/text_above/text_above-eb1db71384.tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/full_width/image/text_above/text_above-fb21622c89.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/full_width/image/text_above/text_above-61d4eb7197.css
+https://www.bloomberg.com/javelin/api/feature_transporter/2017-05-18/real-estate-deals-vanish-in-new-york
+https://personalization.bloomberg.com/user/recommendations/cfru/?session_id=fe5497a8-a455-47e8-8dac-255b618de6be&session_key=fd17e42e58dc1e109d5ffd0c52d325b268d6958f&agent_id=43831dbc-ecba-45f4-ae57-7abd891824cd&breg=&currentResource=Feature%7COQ55076S973201&exclude=Feature%7COQ55076S973201&includedSites=bbiz%3Bbpol%3Bbview&thumbnailRequired=false&decayCoefficient=1&inactivePeriod=2592000000&interactionsLimit=1&maxAge=30&limit=1&rescorers=random%3Bepx&rescorers.epx.minimumScore=0.1&rescorers.random.minimumScore=0.1&resourceTypes=Feature&country=CA&region=US&exp_pref=&timezoneOffset=14400000&backfillFacets=Feature%7CAll&callback=jQuery31103524995561230817_1495122694006&_=1495122694007
+https://assets.bwbx.io/s3/javelin/public/javelin/images/favicon-businessweek-4b63d80936.png
+https://radar.cedexis.com/1/12403/radar.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/breaking_news/breaking_news-869423589f.desktop.js
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://securepubads.g.doubleclick.net/gpt/pubads_impl_118.js
+https://tracking.bloomberg.com/images/tracking-pixel.gif?interactionType=VIEW&region=US&resourceType=Story&resourceId=OQ55076S973201&site=bbiz&referrer=https%3A%2F%2Fnews.ycombinator.com%2F&blocked=false&timezoneOffset=14400000&bb_country=CA&session_id=fe5497a8-a455-47e8-8dac-255b618de6be&session_key=fd17e42e58dc1e109d5ffd0c52d325b268d6958f&agent_id=43831dbc-ecba-45f4-ae57-7abd891824cd
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-8a207a4870.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-90475e9c3c.tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-d4c394838e.large_desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-657b455f52.small_desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-ef97aae51b.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news/breaking_news-daa37d9861.css
+https://cdn.krxd.net/controltag?confid=JbcQbGqp
+https://www.googletagservices.com/tag/js/gpt.js
+https://personalization.bloomberg.com/user/info?limit=20&currentResource=Feature|OQ55076S973201&session_id=fe5497a8-a455-47e8-8dac-255b618de6be
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iuIM7JySdyUc/v7/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iVhT0BYe4iwQ/v1/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iu56TXGXgyNA/v1/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ib17vRKlB9HM/v0/1200x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/irCTvxy9_2p8/v0/1000x-1.jpg
+https://action.media6degrees.com/orbserv/nsjs?adv=cl1005751&ns=993&nc=BB_DS&ncv=48&dstOrderId=[OrderId]&dstOrderAmount=[OrderAmount]
+https://consent.truste.com/notice?domain=bloomberg.com&c=truste&js=bb&noticeType=bb&cookieLink=http://www.bloomberg.com/privacy%23cookies&text=true
+https://www.bloomberg.com/javelin/api/breaking_news/region/US?app=javelin
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://sb.scorecardresearch.com/b?name=business%2Fnews%2Fpursuits&krux_user_id=&bb_localhour=2017-04-18%2011%3A51%3A33&bb_c_type=feature&bb_cg_3=The%20Barbarians%20Are%20at%20Etsy%E2%80%99s%20Hand-Hewn%2C%20Responsibly%20Sourced%20Gates&bb_brand=businessweek&bb_screensize=1920x1053&bb_viewport=1045x882&bb_focus=true&bb_refresh=0&bb_region=US&bb_exp=AMER&c1=2&c2=3005059&c7=https%3A%2F%2Fwww.bloomberg.com%2Fnews%2Ffeatures%2F2017-05-18%2Fthe-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates&c8=The%20Barbarians%20Are%20at%20Etsy%E2%80%99s%20Hand-Hewn%2C%20Responsibly%20Sourced%20Gates%20-%20Bloomberg&c9=https%3A%2F%2Fnews.ycombinator.com%2F&bb_userid=004.5270698131.1495122627418&ns_site=bloomberg&bb_groupid=OQ55076S973201&bb_attributor=businessweek&bb_author=Max%20Chafkin%20and%20Jing%20Cao&bb_pub_d=2017-05-18T09%3A00%3A07.845Z&bb_transporter=0&bb_slug=2017-05-18%2Fthe-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates&bb_topic1=Shareholder%20Value&bb_topic2=Brooklyn%2CIPOs%2CMoney%2CEnvironment%2CPrivate%20Equity%2CTech%2CLaw%2CFood%2CValuation%2CFund%20Manager%2CLos%20Angeles%2CManhattan%2CWall%20Street%2CEarnings%2CNew%20Hampshire%2CSocial%20Security%2CShopping%2CMarketing%2CFamily%2CGender%2CCargo%2CSoftware%2CNew%20York%2CMarkets&bb_people=Chad%20Dickerson%2CFrederick%20R%20Wilson%2CJosh%20Silverman%2CHoward%20D%20Schultz%2CChirag%20Chotalia&bb_category=businessweek-magazine&legacy_bb_contentage=0&ns__t=1495122693715&ns_c=UTF-8
+https://cdn.perfdrive.com/aperture/spectrum.js
+https://s.btstatic.com/tag.js#site=qUYLUpQ
+https://action.dstillery.com/orbserv/nsjs?adv=cl1005751&ns=993&nc=BB_DS&ncv=48&dstOrderId=[OrderId]&dstOrderAmount=[OrderAmount]
+https://ak.sail-horizon.com/horizon/v1.js
+https://www.google-analytics.com/analytics.js
+https://www.google-analytics.com/analytics.js
+https://ads.pubmatic.com/AdServer/js/gshowad.js
+https://nav.bloomberg.com/public/images/ad_choices-62a535e263.png
+https://assets.bwbx.io/s3/javelin/public/javelin/js/nav/lite/social_popup-c8f361fa04.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/truste/truste-6ac723d3b5.js
+https://d1z2jf7jlzjs58.cloudfront.net/p.js
+https://www.googletagmanager.com/gtm.js?id=GTM-MNTH5N
+https://www.bbthat.com/assets/v1.4.0/that.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/image_viewer/image_viewer-1286fdbee3.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/timestamp/timestamp-9befc43f88.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/third_party_embeds/third_party_embeds-ce53bf94e8.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/lazy_images/lazy_images-e6cb415eb4.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/dependencies/dependencies-36374e54c2.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/transporter/transporter-0da6272ee7.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/body/feature/parallax-2aa80e2a39.desktop.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/body/feature/fade_in-458625d9f8.desktop.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/breaking_news_placeholder/breaking_news_placeholder-e16f4bf9e4.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/author_details/author_details-06d9d1cb95.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/components/video_player/video_player-21324077d8.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/ads/initialize/initialize_ads-a33828910a.js
+https://assets.bwbx.io/s3/javelin/public/javelin/js/pianola/pianola-c8c7d8cf08.js
+https://assets.bwbx.io/s3/javelin/public/javelin/images/expand-white-6b61161a47.svg
+https://assets.bwbx.io/font-service/fonts/AvenirNextPForBBG-Regular-09359fef74.woff2
+https://assets.bwbx.io/font-service/fonts/AvenirNextPForBBG-Demi-62597c630e.woff2
+https://assets.bwbx.io/font-service/fonts/Bloomberg-ff408eff85.woff2
+https://assets.bwbx.io/font-service/fonts/PublicoText-Bold-Web-3c5266a48e.woff2
+https://assets.bwbx.io/font-service/fonts/PublicoText-Italic-Web-b04a2274cf.woff2
+https://assets.bwbx.io/font-service/fonts/PublicoText-Roman-Web-bfa063ee27.woff2
+https://assets.bwbx.io/font-service/fonts/AvenirNext-Demi-bb2b2e9964.woff2
+https://assets.bwbx.io/font-service/fonts/TiemposHeadlineWeb-Bold-785dd86801.woff2
+https://assets.bwbx.io/font-service/fonts/TiemposTextWeb-RegularItalic-91232ccd19.woff2
+https://assets.bwbx.io/font-service/fonts/TiemposTextWeb-Regular-0c712f870b.woff2
+https://assets.bwbx.io/font-service/fonts/BWHaasHead-95Black-d9b9c8bdda.woff2
+https://assets.bwbx.io/font-service/fonts/BWHaasHead-75Bold-f38aa54387.woff2
+https://assets.bwbx.io/font-service/fonts/BWHaasText-55Roman-2558d87ee8.woff2
+https://assets.bwbx.io/s3/javelin/public/javelin/images/businessweek-subscribe-b30fc520a7.svg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iuIM7JySdyUc/v7/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iVhT0BYe4iwQ/v1/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/iu56TXGXgyNA/v1/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/ib17vRKlB9HM/v0/60x-1.jpg
+https://assets.bwbx.io/images/users/iqjWHBFdfxIU/irCTvxy9_2p8/v0/150x-1.jpg
+https://assets.bwbx.io/s3/javelin/public/javelin/images/twitter-gray-13d4e4f9c5.svg
+https://assets.bwbx.io/s3/javelin/public/javelin/images/facebook-gray-dfc27bbecd.svg
+https://assets.bwbx.io/s3/javelin/public/javelin/images/businessweek-logo-c7fe78d3e3.svg
+https://assets.bwbx.io/s3/javelin/public/javelin/images/b-icon-gray-6031e4992c.svg
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/image_viewer/image_viewer-e77f06e178.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/image_viewer/image_viewer-493c7f0e8d.mobile-tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/truste/truste-81c63befd0.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/truste/truste-20a23eebbf.tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/truste/truste-6e76f7cadd.large_desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/subscription_touts/businessweek_subscription_tout/businessweek_subscription_tout-5b4ec98406.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/not_quite_full_width/image/text_above/text_above-f37edab7e4.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/not_quite_full_width/image/text_above/text_above-19733e39fa.tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/body/feature/body-34643d1c52.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/body/feature/body-c3b993a7ef.tablet.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/nav/lite/lite-5dc1df2fe8.mobile.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/image_viewer/image_viewer-fabf42e859.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/image_viewer/image_viewer-0480a7f1f0.css
+https://nav.bloomberg.com/public/stylesheets/bb-global-footer-afbf5bc247.css
+https://assets.bwbx.io/font-service/css/Bloomberg/font-face.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/truste/truste-0edd0b2249.small_desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/truste/truste-e9bc778891.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/lazy_images/lazy_image-75e50783da.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/subscription_touts/businessweek_subscription_tout/businessweek_subscription_tout-17d4143677.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/themes/light/light-941297edce.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/author_details/author_details-08648191f2.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/not_quite_full_width/image/text_above/text_above-2839a7871a.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ledes/feature/not_quite_full_width/image/text_above/text_above-85db7dfdd8.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/ads/marquee/marquee-cc614c3c5a.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/components/breaking_news_placeholder/breaking_news-399e864c3c.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/body/feature/body-933ac62f01.desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/body/feature/body-e5135aab44.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/layout/feature/feature-75b68f7420.css
+https://www.bbthat.com/assets/v1.4.0/that.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/nav/lite/lite-d117e45b7e.tablet-desktop.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/nav/lite/lite-2efc3b8ea4.css
+https://assets.bwbx.io/s3/javelin/public/javelin/css/application/application-8a02359333.css
+https://assets.bwbx.io/font-service/css/BWHaasText-55Roman,BWHaasHead-75Bold,BWHaasHead-95Black,TiemposTextWeb-Regular,TiemposTextWeb-RegularItalic,TiemposHeadlineWeb-Bold,AvenirNext-Demi,supriasans-regular-web,supriasans-black-web,PublicoText-Roman-Web,PublicoText-Italic-Web,PublicoText-Bold-Web/font-face.css
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+https://www.bloomberg.com/news/features/2017-05-18/the-barbarians-are-at-etsy-s-hand-hewn-responsibly-sourced-gates
+--></div>
+</body>
+</html>
