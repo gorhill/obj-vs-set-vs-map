@@ -51,7 +51,7 @@ var intBasedTokens = [];
 
 var validTokenChars = (function() {
     var uintArray = new Uint8Array(128),
-        validTokenChars = '0123456789%abcdefghijklmnopqrstuvwxyz.*';
+        validTokenChars = '0123456789%abcdefghijklmnopqrstuvwxyz';
     i = validTokenChars.length;
     while ( i-- ) {
         var c = validTokenChars.charCodeAt(i);
@@ -109,13 +109,13 @@ benchmarkSuite
     .add('- String-based tokens', function() {
         var urls = allURLs;
         for ( var i = 0, n = urls.length; i < n; i++ ) {
-            strBasedTokenize(urls[i]);
+            strBasedTokenize(urls[i].toLowerCase());
         }
     })
     .add('- Int-based tokens', function() {
         var urls = allURLs;
         for ( var i = 0, n = urls.length; i < n; i++ ) {
-            intBasedTokenize(urls[i]);
+            intBasedTokenize(urls[i].toLowerCase());
         }
     })
     .on('cycle', benchmarkCycleHandler)
