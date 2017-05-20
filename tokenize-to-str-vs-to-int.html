@@ -61,10 +61,10 @@ var validTokenChars = (function() {
 })();
 
 var intBasedTokenize = function(url) {
-    var l = url.length;
+    var l = url.length,
+        tokens = intBasedTokens;
     if ( l === 0 ) { tokens[0] = 0; return; }
     var i = 0, j = 0, v, n, ti, th,
-        tokens = intBasedTokens,
         vtc = validTokenChars;
     for (;;) {
         for (;;) {
@@ -77,10 +77,9 @@ var intBasedTokenize = function(url) {
             if ( i === l ) { break; }
             v = vtc[url.charCodeAt(i++)];
             if ( v === 0 ) { break; }
-            if ( n !== 8 ) {
-                th = th * 64 + v;
-                n += 1;
-            }
+            if ( n === 8 ) { continue; }
+            th = th * 64 + v;
+            n += 1;
         }
         tokens[j++] = th;
         tokens[j++] = ti;
