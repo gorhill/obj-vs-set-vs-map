@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 </head>
 <body style="font: 14px sans-serif">
-<h1>Benchmark: Set- vs RegExp-based dictionary of hostnames</h1>
+<h1>Benchmark: Set- vs RegExp- vs Trie-based dictionary of hostnames</h1>
 <p><button id="createBenchmark">Creation</button> <button id="lookupBenchmark">Lookup</button></p>
 <div id="results-0" style="white-space:pre;font-family:mono"></div>
 <div id="results-1" style="white-space:pre;font-family:mono"></div>
@@ -14,6 +14,7 @@
 <div id="results-5" style="white-space:pre;font-family:mono"></div>
 <div id="results-6" style="white-space:pre;font-family:mono"></div>
 
+<script src="https://rawgithub.com/gorhill/uBlock/master/src/js/hntrie.js"></script>
 <script src="https://cdn.jsdelivr.net/lodash/4.17.2/lodash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/platform.js/1.3.3/platform.js"></script>
 <script src="https://cdn.jsdelivr.net/benchmarkjs/2.1.2/benchmark.js"></script>
@@ -150,11 +151,21 @@ var regexBasedDictTest = function(haystack, needle) {
 
 /******************************************************************************/
 
+var trieBasedDictCreate = function(domainOpt) {
+    return HNTrieBuilder.fromDomainOpt(domainOpt);
+}
+var trieBasedDictTest = function(haystack, needle) {
+    return haystack.matches(needle);
+};
+var trieBuilder = new HNTrieBuilder();
+
+/******************************************************************************/
+
 var gResults = [];
-var gDictSmall, gRegexSmall;
-var gDictMedium, gRegexMedium;
-var gDictLarge, gRegexLarge;
-var gDictHuge, gRegexHuge;
+var gDictSmall, gRegexSmall, gTrieSmall;
+var gDictMedium, gRegexMedium, gTrieMedium;
+var gDictLarge, gRegexLarge, gTrieLarge;
+var gDictHuge, gRegexHuge, gTrieHuge;
 var gWhich;
 var gBenchmarks = [ null ];
 
@@ -206,6 +217,9 @@ gBenchmarks.push((function() {
         .add('  - Regex-based', function() {
             gRegexSmall = regexBasedDictCreate(domainLowCount);
             })
+        .add('  -  Trie-based', function() {
+            gTrieSmall = trieBasedDictCreate(domainLowCount);
+            })
         .on('start', function() {
             stdout(gWhich, '');
             stdout(gWhich, 'Create small-size dictionary\n');
@@ -226,6 +240,9 @@ gBenchmarks.push((function() {
         .add('  - Regex-based', function() {
             gRegexMedium = regexBasedDictCreate(domainMediumCount);
             })
+        .add('  -  Trie-based', function() {
+            gTrieMedium = trieBasedDictCreate(domainMediumCount);
+            })
         .on('start', function() {
             stdout(gWhich, '');
             stdout(gWhich, 'Create medium-size dictionary\n');
@@ -245,6 +262,9 @@ gBenchmarks.push((function() {
             })
         .add('  - Regex-based', function() {
             gRegexLarge = regexBasedDictCreate(domainHighCount);
+            })
+        .add('  -  Trie-based', function() {
+            gTrieLarge = trieBasedDictCreate(domainHighCount);
             })
         .on('start', function() {
             stdout(gWhich, '');
@@ -274,9 +294,15 @@ gBenchmarks.push((function() {
                 gResults[i] = regexBasedDictTest(gRegexSmall, randomNeedle());
             }
             })
+        .add('  -  Trie-based', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieSmall, randomNeedle());
+            }
+            })
         .on('start', function() {
             gDictSmall = setBasedDictCreate(domainLowCount);
             gRegexSmall = regexBasedDictCreate(domainLowCount);
+            gTrieSmall = trieBasedDictCreate(domainLowCount);
             stdout(gWhich, '');
             stdout(gWhich, 'Test ' + lookupCount + ' needles against small-size dictionary\n');
            })
@@ -300,9 +326,15 @@ gBenchmarks.push((function() {
                 gResults[i] = regexBasedDictTest(gRegexMedium, randomNeedle());
             }
             })
+        .add('  -  Trie-based', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieMedium, randomNeedle());
+            }
+            })
         .on('start', function() {
             gDictMedium = setBasedDictCreate(domainMediumCount);
             gRegexMedium = regexBasedDictCreate(domainMediumCount);
+            gTrieMedium = trieBasedDictCreate(domainMediumCount);
             stdout(gWhich, '');
             stdout(gWhich, 'Test ' + lookupCount + ' needles against medium-size dictionary\n');
             })
@@ -326,9 +358,15 @@ gBenchmarks.push((function() {
                 gResults[i] = regexBasedDictTest(gRegexLarge, randomNeedle());
             }
             })
+        .add('  -  Trie-based', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieLarge, randomNeedle());
+            }
+            })
         .on('start', function() {
             gDictLarge = setBasedDictCreate(domainHighCount);
             gRegexLarge = regexBasedDictCreate(domainHighCount);
+            gTrieLarge = trieBasedDictCreate(domainHighCount);
             stdout(gWhich, '');
             stdout(gWhich, 'Test ' + lookupCount + ' needles against large-size dictionary\n');
             })
