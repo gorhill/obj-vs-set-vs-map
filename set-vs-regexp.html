@@ -161,10 +161,19 @@ var trieBuilder = new HNTrieBuilder();
 
 /******************************************************************************/
 
+var trieBasedWasmDictCreate = function(trie16) {
+    return HNTrie16wasm.create(trie16.buf);
+}
+var trieBasedWasmDictTest = function(id, needle) {
+    return HNTrie16wasm.matches(id, needle);
+};
+
+/******************************************************************************/
+
 var gResults = [];
 var gDictSmall, gRegexSmall, gTrieSmall;
 var gDictMedium, gRegexMedium, gTrieMedium;
-var gDictLarge, gRegexLarge, gTrieLarge;
+var gDictLarge, gRegexLarge, gTrieLarge, gTrieLargeWasm;
 var gDictHuge, gRegexHuge, gTrieHuge;
 var gWhich;
 var gBenchmarks = [ null ];
@@ -283,23 +292,27 @@ var lookupCount = 1000;
 
 gBenchmarks.push((function() {
     var bms = new Benchmark.Suite();
+    var needles = [];
     bms
         .add('  -   Set-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = setBasedDictTest(gDictSmall, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = setBasedDictTest(gDictSmall, needles[i]);
             }
             })
         .add('  - Regex-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = regexBasedDictTest(gRegexSmall, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = regexBasedDictTest(gRegexSmall, needles[i]);
             }
             })
         .add('  -  Trie-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = trieBasedDictTest(gTrieSmall, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieSmall, needles[i]);
             }
             })
         .on('start', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                needles[i] = randomNeedle();
+            }
             gDictSmall = setBasedDictCreate(domainLowCount);
             gRegexSmall = regexBasedDictCreate(domainLowCount);
             gTrieSmall = trieBasedDictCreate(domainLowCount);
@@ -315,23 +328,27 @@ gBenchmarks.push((function() {
 
 gBenchmarks.push((function() {
     var bms = new Benchmark.Suite();
+    var needles = [];
     bms
         .add('  -   Set-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = setBasedDictTest(gDictMedium, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = setBasedDictTest(gDictMedium, needles[i]);
             }
             })
         .add('  - Regex-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = regexBasedDictTest(gRegexMedium, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = regexBasedDictTest(gRegexMedium, needles[i]);
             }
             })
         .add('  -  Trie-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = trieBasedDictTest(gTrieMedium, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieMedium, needles[i]);
             }
             })
         .on('start', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                needles[i] = randomNeedle();
+            }
             gDictMedium = setBasedDictCreate(domainMediumCount);
             gRegexMedium = regexBasedDictCreate(domainMediumCount);
             gTrieMedium = trieBasedDictCreate(domainMediumCount);
@@ -347,26 +364,33 @@ gBenchmarks.push((function() {
 
 gBenchmarks.push((function() {
     var bms = new Benchmark.Suite();
+    var needles = [];
     bms
         .add('  -   Set-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = setBasedDictTest(gDictLarge, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = setBasedDictTest(gDictLarge, needles[i]);
             }
             })
         .add('  - Regex-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = regexBasedDictTest(gRegexLarge, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = regexBasedDictTest(gRegexLarge, needles[i]);
             }
             })
         .add('  -  Trie-based', function() {
-            for ( var i = 0, n = lookupCount; i < n; i++ ) {
-                gResults[i] = trieBasedDictTest(gTrieLarge, randomNeedle());
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = trieBasedDictTest(gTrieLarge, needles[i]);
             }
             })
         .on('start', function() {
+            for ( var i = 0, n = lookupCount; i < n; i++ ) {
+                needles[i] = randomNeedle();
+            }
             gDictLarge = setBasedDictCreate(domainHighCount);
             gRegexLarge = regexBasedDictCreate(domainHighCount);
             gTrieLarge = trieBasedDictCreate(domainHighCount);
+            if ( typeof HNTrie16wasm !== 'undefined' ) {
+                gTrieLargeWasm = trieBasedWasmDictCreate(gTrieLarge);
+            }
             stdout(gWhich, '');
             stdout(gWhich, 'Test ' + lookupCount + ' needles against large-size dictionary\n');
             })
@@ -374,6 +398,14 @@ gBenchmarks.push((function() {
             stdout(gWhich, String(event.target) + '\n');
             })
         .on('complete', exitBenchmark);
+
+    if ( typeof HNTrie16wasm !== 'undefined' ) {
+        bms.add('  -  Trie-based (WASM)', function() {
+            for ( var i = 0, n = needles.length; i < n; i++ ) {
+                gResults[i] = trieBasedWasmDictTest(gTrieLargeWasm, needles[i]);
+            }
+        });
+    }
     return bms;
 })());
 
